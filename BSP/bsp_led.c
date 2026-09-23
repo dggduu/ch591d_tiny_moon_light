@@ -70,7 +70,7 @@ void BSP_LED_UpdateOutput(void)
         uint8_t r, g, b;
         uint32_t pos;
         speed = tmp.effectSpeed + 1u;
-        pos = (g_tick * speed) >> 2;  /* roughly position on the 0..255 wheel */
+        pos = (g_tick * speed) >> 2;
         rgb_wheel((uint8_t)(pos & 0xFFu), &r, &g, &b);
         tmp.rgb[0] = r;
         tmp.rgb[1] = g;
@@ -80,9 +80,16 @@ void BSP_LED_UpdateOutput(void)
     {
         uint32_t phase = (g_tick * (tmp.effectSpeed + 1u)) >> 3;
         uint8_t breathe;
-        /* triangular 0..100..0 */
-        phase &= 0x1FFu;
-        breathe = (uint8_t)((phase < 100u) ? phase : (200u - phase));
+
+        /* 修复：将相位限制在 0~199，避免无符号下溢 */
+        phase %= 200;
+
+        if (phase < 100u) {
+            breathe = (uint8_t)phase;
+        } else {
+            breathe = (uint8_t)(200u - phase);
+        }
+
         tmp.brightness = (uint8_t)(((uint32_t)tmp.brightness * breathe) / 100u);
     }
 
@@ -92,7 +99,6 @@ void BSP_LED_UpdateOutput(void)
     }
     else
     {
-        /* gradient and colorful use the generated RGB wheel */
         tmp.power = g_light.power;
         set_all_pwm(scale_channel(tmp.rgb[0], tmp.brightness, tmp.power),
                     scale_channel(tmp.rgb[1], tmp.brightness, tmp.power),
@@ -109,14 +115,17 @@ void BSP_LED_TaskTick(void)
 
 void BSP_LED_Init(void)
 {
+    /* 【修复】先清输出锁存，再切换为输出，避免上电瞬间栅极浮空导致闪红 */
+    GPIOA_ResetBits(IO_RED | IO_BLUE);
+    GPIOB_ResetBits(IO_GREEN);
     GPIOA_ModeCfg(IO_RED | IO_BLUE, GPIO_ModeOut_PP_5mA);
     GPIOB_ModeCfg(IO_GREEN, GPIO_ModeOut_PP_5mA);
 
-    PWMX_CLKCfg(4);                    /* PWM base clock = 4/Fsys */
-    PWMX_CycleCfg(PWMX_Cycle_64);      /* 64 steps per PWM period */
+    PWMX_CLKCfg(1);                    /* PWM base clock = 4/Fsys */
+    PWMX_CycleCfg(PWMX_Cycle_256);      /* 64 steps per PWM period */
 
     g_light.power = 0;
-    g_light.brightness = 80;
+    g_light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;   /* 默认 70 */
     g_light.mode = BSP_LIGHT_MODE_FIXED;
     g_light.rgb[0] = 255;
     g_light.rgb[1] = 255;
@@ -133,10 +142,13 @@ void BSP_LED_SetState(const BSP_LightState_t *pState)
     if(!pState)
         return;
     g_light.power = pState->power ? 1u : 0u;
-    if(pState->brightness > 100u)
-        g_light.brightness = 100u;
+
+    /* 【修改】统一钳位到 BSP_LIGHT_BRIGHTNESS_LIMIT(70) */
+    if(pState->brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
+        g_light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
     else
         g_light.brightness = pState->brightness;
+
     g_light.mode = pState->mode & 0x03u;
     g_light.rgb[0] = pState->rgb[0];
     g_light.rgb[1] = pState->rgb[1];

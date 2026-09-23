@@ -22,13 +22,14 @@
 
 #define BSP_LIGHT_COLOR_MAX        255u
 #define BSP_LIGHT_BRIGHTNESS_MAX   100u
+#define BSP_LIGHT_BRIGHTNESS_LIMIT 70u   /* 实际生效上限，硬件足够亮 */
 
-#define BSP_LIGHT_PWM_CYCLE        64u
+#define BSP_LIGHT_PWM_CYCLE        256u
 
 typedef struct __attribute__((packed))
 {
     uint8_t  power;       /* 0=OFF, 1=ON */
-    uint8_t  brightness;  /* 0..100 */
+    uint8_t  brightness;  /* 0..BSP_LIGHT_BRIGHTNESS_LIMIT */
     uint8_t  mode;        /* fixed/gradient/breathing/colorful */
     uint8_t  rgb[3];      /* R,G,B 0..255 */
     uint16_t colorTemp;   /* 2700..6500, for future RGBW/dual-color */

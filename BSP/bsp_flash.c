@@ -18,8 +18,9 @@ void BSP_NVM_LoadDefault(BSP_Nvm_t *pNvm)
     memset(pNvm, 0, sizeof(*pNvm));
     pNvm->magic = BSP_NVM_MAGIC;
     pNvm->len = sizeof(*pNvm);
+
     pNvm->light.power = 0;
-    pNvm->light.brightness = 80;
+    pNvm->light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;   /* д╛хо 70 */
     pNvm->light.mode = BSP_LIGHT_MODE_FIXED;
     pNvm->light.rgb[0] = 255;
     pNvm->light.rgb[1] = 255;
@@ -34,12 +35,14 @@ void BSP_NVM_LoadDefault(BSP_Nvm_t *pNvm)
                          BSP_RTC_REPEAT_WED | BSP_RTC_REPEAT_THU |
                          BSP_RTC_REPEAT_FRI;
     pNvm->timer.action = BSP_RTC_ACTION_OFF;
-    pNvm->timer.brightness = 80;
+    pNvm->timer.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;   /* д╛хо 70 */
     pNvm->timer.rgb[0] = 255;
     pNvm->timer.rgb[1] = 200;
     pNvm->timer.rgb[2] = 150;
     pNvm->timer.durationMin = 0;
-    pNvm->crc = calc_crc((const uint8_t *)pNvm + 6, (uint16_t)sizeof(*pNvm) - 6);
+
+    pNvm->crc = calc_crc((const uint8_t *)pNvm + 6,
+                         (uint16_t)sizeof(*pNvm) - 6);
 }
 
 uint8_t BSP_NVM_Load(BSP_Nvm_t *pNvm)
