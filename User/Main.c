@@ -77,7 +77,6 @@ void led_preinit() {
     GPIOB_ModeCfg(IO_GREEN, GPIO_ModeOut_PP_5mA);
 }
 
-
 int main(void)
 {
 #if(defined(DCDC_ENABLE)) && (DCDC_ENABLE == TRUE)

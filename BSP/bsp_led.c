@@ -8,7 +8,7 @@ static uint32_t g_tick;
 static void pwm_out_channel(uint8_t ch, uint8_t value)
 {
     /* PWM cycle is 64; value 0..63 maps to 0..~100% */
-    PWMX_ACTOUT(ch, value, Low_Level, ENABLE);
+    PWMX_ACTOUT(ch, value, High_Level, ENABLE);
 }
 
 static void set_all_pwm(uint8_t r, uint8_t g, uint8_t b)
@@ -116,10 +116,10 @@ void BSP_LED_TaskTick(void)
 void BSP_LED_Init(void)
 {
     /* 【修复】先清输出锁存，再切换为输出，避免上电瞬间栅极浮空导致闪红 */
-    GPIOA_ResetBits(IO_RED | IO_BLUE);
-    GPIOB_ResetBits(IO_GREEN);
-    GPIOA_ModeCfg(IO_RED | IO_BLUE, GPIO_ModeOut_PP_5mA);
-    GPIOB_ModeCfg(IO_GREEN, GPIO_ModeOut_PP_5mA);
+    GPIOA_ResetBits(IO_RED | IO_GREEN);
+    GPIOB_ResetBits(IO_BLUE);
+    GPIOA_ModeCfg(IO_RED | IO_GREEN, GPIO_ModeOut_PP_5mA);
+    GPIOB_ModeCfg(IO_BLUE,          GPIO_ModeOut_PP_5mA);
 
     PWMX_CLKCfg(1);                    /* PWM base clock = 4/Fsys */
     PWMX_CycleCfg(PWMX_Cycle_256);      /* 64 steps per PWM period */

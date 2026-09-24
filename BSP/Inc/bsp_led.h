@@ -6,13 +6,13 @@
 #include "CH59x_common.h"
 
 /* Existing PWM/GPIO pin mapping from the schematic */
-#define PWM_BLUE    CH_PWM5
+#define PWM_BLUE    CH_PWM7
 #define PWM_RED     CH_PWM4
-#define PWM_GREEN   CH_PWM7
+#define PWM_GREEN   CH_PWM5
 
-#define IO_BLUE     GPIO_Pin_13
+#define IO_BLUE     GPIO_Pin_4
 #define IO_RED      GPIO_Pin_12
-#define IO_GREEN    GPIO_Pin_4
+#define IO_GREEN    GPIO_Pin_13
 
 /* Light mode, stored in the characteristic / flash */
 #define BSP_LIGHT_MODE_FIXED       0u
