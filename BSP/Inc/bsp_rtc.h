@@ -33,11 +33,33 @@ typedef struct __attribute__((packed))
     uint8_t durationMin;  /* duration in minutes; 0 = no auto restore */
 } BSP_RtcTimer_t;
 
+/*
+ * ---------------------------------------------------------------------------
+ * Wall clock design note
+ * ---------------------------------------------------------------------------
+ * The CH59x RTC is a free running 32KHz counter that the BLE stack / TMOS
+ * timer subsystem also uses as its time base (see HAL_TimeInit()).
+ * Reloading that counter while the stack is running (RTC_InitTime() /
+ * RTC_SetCycle32k()) desynchronises the BLE clock and blocks the main loop,
+ * which is what froze the MCU when the phone wrote the time characteristic.
+ *
+ * Therefore the counter is never touched again after startup. The calendar
+ * time is kept as a software offset on top of the monotonic counter, and the
+ * official HAL API (RTC_GetCycle32k(), and RTC_InitTime() once at boot) is
+ * still the only RTC access used.
+ */
+
+/* Seed the RTC once, during start-up, before the BLE stack is running. */
 void    BSP_RTC_Init(void);
+
+/* Advance the software clock. Must be called from a periodic task (~1s). */
+void    BSP_RTC_Tick(void);
+
 void    BSP_RTC_SetWallClock(uint16_t year, uint8_t month, uint8_t day,
                              uint8_t hour, uint8_t minute, uint8_t second);
 void    BSP_RTC_GetWallClock(uint16_t *year, uint8_t *month, uint8_t *day,
                              uint8_t *hour, uint8_t *minute, uint8_t *second);
+
 void    BSP_RTC_SetTimer(const BSP_RtcTimer_t *pTimer);
 void    BSP_RTC_GetTimer(BSP_RtcTimer_t *pOut);
 void    BSP_RTC_ClearTimer(void);

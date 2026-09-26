@@ -21,7 +21,7 @@
 #define BSP_BLE_ADV_INTERVAL         160u
 #define BSP_BLE_TICK_PERIOD_MS       50u
 #define BSP_BLE_BATTERY_PERIOD_MS    300000u
-#define BSP_BLE_SAVE_DELAY_MS        2000u
+#define BSP_BLE_SAVE_DELAY_MS        1000u
 
 #define BSP_BLE_CHAR_TIMER_LEN       ((uint16_t)sizeof(BSP_RtcTimer_t))
 
@@ -35,7 +35,6 @@ typedef struct
 
 static uint8_t BSP_BleTaskID = INVALID_TASK_ID;
 static BSP_BleConnItem_t connItem;
-static BSP_Nvm_t g_nvm;
 static uint8_t g_nvmDirty = 0;
 
 static uint8_t attDeviceName[] = "CH591D";
@@ -145,22 +144,24 @@ static gapBondCBs_t BSP_Ble_BondCBs = {
 /* ============================================================
  *  NVM 防抖
  * ============================================================ */
-static void save_settings(void)
+static uint8_t save_settings(void)
 {
-    g_nvm.light.power = valPower;
-    g_nvm.light.brightness = valBrightness;
-    g_nvm.light.mode = valMode;
-    g_nvm.light.rgb[0] = valColor[0];
-    g_nvm.light.rgb[1] = valColor[1];
-    g_nvm.light.rgb[2] = valColor[2];
-    g_nvm.light.colorTemp = (uint16_t)(valColorTemp[0] | ((uint16_t)valColorTemp[1] << 8));
-    g_nvm.light.effectSpeed = valEffectSpeed;
-
     BSP_RtcTimer_t timer;
-    BSP_RTC_GetTimer(&timer);
-    g_nvm.timer = timer;
 
-    BSP_NVM_Save(&g_nvm);
+    /* NOTE: the on/off state is intentionally not persisted, the lamp always
+     * comes back up switched off after a power cycle. */
+    g_settings.light.brightness = valBrightness;
+    g_settings.light.mode = valMode;
+    g_settings.light.rgb[0] = valColor[0];
+    g_settings.light.rgb[1] = valColor[1];
+    g_settings.light.rgb[2] = valColor[2];
+    g_settings.light.colorTemp = (uint16_t)(valColorTemp[0] | ((uint16_t)valColorTemp[1] << 8));
+    g_settings.light.effectSpeed = valEffectSpeed;
+
+    BSP_RTC_GetTimer(&timer);
+    g_settings.timer = timer;
+
+    return BSP_NVM_Save();
 }
 
 static void mark_nvm_dirty(void)
@@ -178,8 +179,8 @@ static void flush_nvm(void)
 {
     if (g_nvmDirty)
     {
-        save_settings();
-        g_nvmDirty = 0;
+        if (save_settings() == 0)
+            g_nvmDirty = 0;
     }
 }
 
@@ -208,18 +209,38 @@ static uint16_t find_attr_handle(uint16_t uuid)
 static void load_settings(void)
 {
     BSP_LightState_t light;
-    BSP_RtcTimer_t timer;
 
-    if (BSP_NVM_Load(&g_nvm) != 0)
-        BSP_NVM_LoadDefault(&g_nvm);
+    memset(&g_settings, 0, sizeof(g_settings));
 
-    light = g_nvm.light;
+    if (BSP_NVM_Load() != 0)
+    {
+        PRINT("NVM: no valid record, using defaults\r\n");
+        BSP_NVM_LoadDefault();
+    }
+    else
+    {
+        PRINT("NVM: settings restored\r\n");
+    }
 
-    /* 【防御】即使 Flash 里存着 100，也要钳到 70 */
-    if (light.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
-        light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
+    /* 【防御】钳位 Flash 中可能存在的越界值 */
+    if (g_settings.light.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
+        g_settings.light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
+    if (g_settings.light.mode > BSP_LIGHT_MODE_COLORFUL)
+        g_settings.light.mode = BSP_LIGHT_MODE_FIXED;
 
-    valPower = light.power;
+    /* field by field: BSP_LightState_t and the stored record differ in layout */
+    light.power       = 0;
+    light.brightness  = g_settings.light.brightness;
+    light.mode        = g_settings.light.mode;
+    light.rgb[0]      = g_settings.light.rgb[0];
+    light.rgb[1]      = g_settings.light.rgb[1];
+    light.rgb[2]      = g_settings.light.rgb[2];
+    light.colorTemp   = g_settings.light.colorTemp;
+    light.effectSpeed = g_settings.light.effectSpeed;
+
+    /* The lamp always starts switched off, its on/off state is not stored. */
+    valPower = 0;
+
     valBrightness = light.brightness;
     valMode = light.mode;
     valColor[0] = light.rgb[0];
@@ -231,12 +252,11 @@ static void load_settings(void)
 
     BSP_LED_SetState(&light);
 
-    timer = g_nvm.timer;
-    if (timer.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
-        timer.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
+    if (g_settings.timer.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
+        g_settings.timer.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
 
-    BSP_RTC_SetTimer(&timer);
-    memcpy(valTimer, &timer, sizeof(timer));
+    BSP_RTC_SetTimer(&g_settings.timer);
+    memcpy(valTimer, &g_settings.timer, sizeof(g_settings.timer));
 }
 
 static void apply_timer_to_light(const BSP_RtcTimer_t *pTimer)
@@ -497,6 +517,7 @@ static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAtt
                 uint16_t year = (uint16_t)(pValue[0] | ((uint16_t)pValue[1] << 8));
                 BSP_RTC_SetWallClock(year, pValue[2], pValue[3],
                                      pValue[4], pValue[5], pValue[6]);
+                read_wall_clock_into_attr();
                 memcpy(valRtcTime, pValue, 7);
             }
             break;
@@ -556,6 +577,9 @@ static void BSP_Ble_Tick(void)
     {
         BSP_RtcTimer_t timer;
         rtcMsAccum -= 1000u;
+
+        /* advance the software wall clock on top of the RTC cycle counter */
+        BSP_RTC_Tick();
 
         if (autoOffRemainSec > 0)
         {
