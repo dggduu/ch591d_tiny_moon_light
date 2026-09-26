@@ -20,7 +20,7 @@
 
 #define BSP_BLE_ADV_INTERVAL         160u
 #define BSP_BLE_TICK_PERIOD_MS       50u
-#define BSP_BLE_BATTERY_PERIOD_MS    30000u
+#define BSP_BLE_BATTERY_PERIOD_MS    300000u
 #define BSP_BLE_SAVE_DELAY_MS        2000u
 
 #define BSP_BLE_CHAR_TIMER_LEN       ((uint16_t)sizeof(BSP_RtcTimer_t))

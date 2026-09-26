@@ -22,7 +22,7 @@
 
 #define BSP_LIGHT_COLOR_MAX        255u
 #define BSP_LIGHT_BRIGHTNESS_MAX   100u
-#define BSP_LIGHT_BRIGHTNESS_LIMIT 70u   /* 实际生效上限，硬件足够亮 */
+#define BSP_LIGHT_BRIGHTNESS_LIMIT 100u   /* 实际生效上限，硬件足够亮 */
 
 #define BSP_LIGHT_PWM_CYCLE        256u
 

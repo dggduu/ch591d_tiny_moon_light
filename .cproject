@@ -287,7 +287,7 @@
             </toolChain>
           </folderInfo>
           <sourceEntries>
-            <entry excluding="StdPeriphDriver/CH59x_usbhostClass.c|StdPeriphDriver/CH59x_usbhostBase.c|StdPeriphDriver/CH59x_usbdev.c|StdPeriphDriver/CH59x_uart3.c|StdPeriphDriver/CH59x_uart2.c|StdPeriphDriver/CH59x_timer3.c|StdPeriphDriver/CH59x_timer2.c|StdPeriphDriver/CH59x_timer1.c|StdPeriphDriver/CH59x_timer0.c|StdPeriphDriver/CH59x_spi0.c|EXAM" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+            <entry excluding="StdPeriphDriver/CH59x_usbhostClass.c|StdPeriphDriver/CH59x_usbhostBase.c|StdPeriphDriver/CH59x_usbdev.c|StdPeriphDriver/CH59x_uart3.c|StdPeriphDriver/CH59x_uart2.c|StdPeriphDriver/CH59x_timer3.c|StdPeriphDriver/CH59x_timer2.c|StdPeriphDriver/CH59x_timer1.c|StdPeriphDriver/CH59x_timer0.c|StdPeriphDriver/CH59x_spi0.c|EXAM|Profile" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
           </sourceEntries>
         </configuration>
       </storageModule>

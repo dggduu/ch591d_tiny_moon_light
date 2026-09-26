@@ -5,7 +5,7 @@
 #include "CH59x_common.h"
 
 /* GPIOB */
-#define IO_BAT_EN   GPIO_Pin_7
+#define IO_BAT_EN   GPIO_Pin_11
 /* GPIOA */
 #define IO_BAT      GPIO_Pin_14
 #define CH_BAT      CH_EXTIN_4

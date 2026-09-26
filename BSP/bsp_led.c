@@ -115,7 +115,6 @@ void BSP_LED_TaskTick(void)
 
 void BSP_LED_Init(void)
 {
-    /* 【修复】先清输出锁存，再切换为输出，避免上电瞬间栅极浮空导致闪红 */
     GPIOA_ResetBits(IO_RED | IO_GREEN);
     GPIOB_ResetBits(IO_BLUE);
     GPIOA_ModeCfg(IO_RED | IO_GREEN, GPIO_ModeOut_PP_5mA);
@@ -143,7 +142,6 @@ void BSP_LED_SetState(const BSP_LightState_t *pState)
         return;
     g_light.power = pState->power ? 1u : 0u;
 
-    /* 【修改】统一钳位到 BSP_LIGHT_BRIGHTNESS_LIMIT(70) */
     if(pState->brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
         g_light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
     else

@@ -58,7 +58,8 @@
 					"${project}/StdPeriphDriver/CH59x_timer1.c",
 					"${project}/StdPeriphDriver/CH59x_timer0.c",
 					"${project}/StdPeriphDriver/CH59x_spi0.c",
-					"${project}/EXAM"
+					"${project}/EXAM",
+					"${project}/Profile"
 				],
 				"optimization": {
 					"level": "size",
