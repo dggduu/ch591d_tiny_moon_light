@@ -2,11 +2,12 @@
 #include "bsp_battary.h"
 
 /* 分压比：BAT_ADC = VBAT × 82/(100+82) ≈ VBAT × 0.4505 */
+/* 增益 0dB(1x)：ADC 端满量程 0~2.1V，4.2V 电池 -> 1.89V，饱和点约 VBAT 4.66V */
 #define BAT_DIV_R1_K             100u
 #define BAT_DIV_R2_K             82u
 
 #define BAT_ADC_SAMPLES          16u
-#define BAT_SETTLE_US            3000u   /* 保持 3ms 稳定时间，确保 C10 充满 */
+#define BAT_SETTLE_US            1800u   /* 4τ 稳定时间：R_th = R22 ∥ R3 = 45.05kΩ，τ = 45.05k × 10nF = 0.45ms，4τ = 1.8ms */
 
 static uint8_t g_inited = 0;
 
@@ -24,13 +25,14 @@ static uint16_t adc_sample_mv(void)
     BAT_ENABLE();                              /* PA11 拉低，PMOS 导通 */
     GPIOA_ModeCfg(IO_BAT, GPIO_ModeIN_Floating);
 
-    ADC_ExtSingleChSampInit(SampleFreq_3_2, ADC_PGA_1_2);
+    /* 0dB：分压后 1.49~1.89V 正落在手册 0~2V 高精度区 */
+    ADC_ExtSingleChSampInit(SampleFreq_3_2, ADC_PGA_0);
     ADC_ChannelCfg(CH_BAT);
 
     rough = ADC_DataCalib_Rough();
     ADC_ChannelCfg(CH_BAT);
 
-    DelayUs(BAT_SETTLE_US);                    /* 等待 RC 网络稳定 */
+    DelayUs(BAT_SETTLE_US);                    /* 等 4τ，分压网络稳定 */
 
     for(i = 0; i < BAT_ADC_SAMPLES; i++)
     {
@@ -44,7 +46,8 @@ static uint16_t adc_sample_mv(void)
 
     sum /= BAT_ADC_SAMPLES;
 
-    vin_mv = ((int32_t)sum - 1024) * 1050 / 1024;
+    /* 0dB 公式 Vi = (ADC/2048) * Vref，Vref = 1.05V */
+    vin_mv = (int32_t)sum * 1050 / 2048;
     if(vin_mv < 0) vin_mv = 0;
 
     return (uint16_t)vin_mv;

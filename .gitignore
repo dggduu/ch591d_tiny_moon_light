@@ -1,3 +1,9 @@
 .mrs/
 EXAM/
 obj/
+.pnpm-store/
+.dsh-profile-backup/
+.dsh-acl-recovery/
+agent_plugins/dsh_moon_light_ch591d/scripts/test.cjs
+.pnpm-store/
+比赛文档.docx

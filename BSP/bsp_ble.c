@@ -60,6 +60,10 @@ static uint8_t valEffectSpeed;
 static uint8_t valTimer[BSP_BLE_CHAR_TIMER_LEN];
 static uint8_t valBattery;
 static uint8_t valRtcTime[7];
+/* countdown auto-off (0xFFFA): 2 bytes LE, seconds; 0 = disabled */
+static uint8_t valCountdown[2];
+/* seconds left, decremented by the 1s tick (0 = idle) */
+static uint32_t countdownRemainSec = 0;
 
 static gattCharCfg_t batteryCharCfg[PERIPHERAL_MAX_CONNECTION];
 
@@ -72,6 +76,7 @@ static uint8_t propEffectSpeed  = GATT_PROP_READ | GATT_PROP_WRITE;
 static uint8_t propTimer        = GATT_PROP_READ | GATT_PROP_WRITE;
 static uint8_t propBattery      = GATT_PROP_READ | GATT_PROP_NOTIFY;
 static uint8_t propRtcTime      = GATT_PROP_READ | GATT_PROP_WRITE;
+static uint8_t propCountdown    = GATT_PROP_READ | GATT_PROP_WRITE;
 
 static const uint8_t servUUID[ATT_BT_UUID_SIZE]        = { LO_UINT16(BSP_BLE_SERVICE_UUID), HI_UINT16(BSP_BLE_SERVICE_UUID) };
 static const uint8_t powerUUID[ATT_BT_UUID_SIZE]       = { LO_UINT16(BSP_BLE_POWER_UUID), HI_UINT16(BSP_BLE_POWER_UUID) };
@@ -83,6 +88,7 @@ static const uint8_t effectSpeedUUID[ATT_BT_UUID_SIZE] = { LO_UINT16(BSP_BLE_EFF
 static const uint8_t timerUUID[ATT_BT_UUID_SIZE]       = { LO_UINT16(BSP_BLE_TIMER_UUID), HI_UINT16(BSP_BLE_TIMER_UUID) };
 static const uint8_t batteryUUID[ATT_BT_UUID_SIZE]     = { LO_UINT16(BSP_BLE_BATTERY_UUID), HI_UINT16(BSP_BLE_BATTERY_UUID) };
 static const uint8_t rtcTimeUUID[ATT_BT_UUID_SIZE]     = { LO_UINT16(BSP_BLE_RTC_TIME_UUID), HI_UINT16(BSP_BLE_RTC_TIME_UUID) };
+static const uint8_t countdownUUID[ATT_BT_UUID_SIZE]   = { LO_UINT16(BSP_BLE_COUNTDOWN_UUID), HI_UINT16(BSP_BLE_COUNTDOWN_UUID) };
 
 static gattAttrType_t lightServiceType = {ATT_BT_UUID_SIZE, (uint8_t *)servUUID};
 
@@ -107,6 +113,8 @@ static gattAttribute_t lightAttrTbl[] = {
     { {ATT_BT_UUID_SIZE, clientCharCfgUUID},  GATT_PERMIT_READ | GATT_PERMIT_WRITE, 0, (uint8_t *)batteryCharCfg },
     { {ATT_BT_UUID_SIZE, characterUUID},      GATT_PERMIT_READ, 0, &propRtcTime },
     { {ATT_BT_UUID_SIZE, rtcTimeUUID},        GATT_PERMIT_READ | GATT_PERMIT_WRITE, 0, valRtcTime },
+    { {ATT_BT_UUID_SIZE, characterUUID},      GATT_PERMIT_READ, 0, &propCountdown },
+    { {ATT_BT_UUID_SIZE, countdownUUID},      GATT_PERMIT_READ | GATT_PERMIT_WRITE, 0, valCountdown },
 };
 
 static bStatus_t BSP_LightReadAttrCB(uint16_t connHandle, gattAttribute_t *pAttr,
@@ -142,7 +150,7 @@ static gapBondCBs_t BSP_Ble_BondCBs = {
 };
 
 /* ============================================================
- *  NVM ∑¿∂∂
+ *  NVM Èò≤Êäñ
  * ============================================================ */
 static uint8_t save_settings(void)
 {
@@ -185,7 +193,7 @@ static void flush_nvm(void)
 }
 
 /* ============================================================
- *  ‘À–– ±≤È’“ Ù–‘æ‰±˙
+ *  ËøêË°åÊó∂Êü•ÊâæÂ±ûÊÄßÂè•ÊüÑ
  * ============================================================ */
 static uint16_t find_attr_handle(uint16_t uuid)
 {
@@ -204,7 +212,7 @@ static uint16_t find_attr_handle(uint16_t uuid)
 }
 
 /* ============================================================
- *  º”‘ÿ”Î”¶”√
+ *  Âä†ËΩΩ‰∏éÂ∫îÁî®
  * ============================================================ */
 static void load_settings(void)
 {
@@ -222,7 +230,7 @@ static void load_settings(void)
         PRINT("NVM: settings restored\r\n");
     }
 
-    /* °æ∑¿”˘°ø«ØŒª Flash ÷–ø…ƒ‹¥Ê‘⁄µƒ‘ΩΩÁ÷µ */
+    /* „ÄêÈò≤Âæ°„ÄëÈí≥‰Ωç Flash ‰∏≠ÂèØËÉΩÂ≠òÂú®ÁöÑË∂äÁïåÂÄº */
     if (g_settings.light.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT)
         g_settings.light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;
     if (g_settings.light.mode > BSP_LIGHT_MODE_COLORFUL)
@@ -273,7 +281,7 @@ static void apply_timer_to_light(const BSP_RtcTimer_t *pTimer)
     else if (pTimer->action == BSP_RTC_ACTION_ON || pTimer->action == BSP_RTC_ACTION_SET)
     {
         light.power = 1;
-        light.brightness = pTimer->brightness;   /* BSP_LED_SetState ƒ⁄≤øª·«ØŒª */
+        light.brightness = pTimer->brightness;   /* BSP_LED_SetState ÂÜÖÈÉ®‰ºöÈí≥‰Ωç */
         light.rgb[0] = pTimer->rgb[0];
         light.rgb[1] = pTimer->rgb[1];
         light.rgb[2] = pTimer->rgb[2];
@@ -303,7 +311,7 @@ static void read_wall_clock_into_attr(void)
 }
 
 /* ============================================================
- *  GATT ∂¡ªÿµ˜
+ *  GATT ËØªÂõûË∞É
  * ============================================================ */
 static bStatus_t BSP_LightReadAttrCB(uint16_t connHandle, gattAttribute_t *pAttr,
                                      uint8_t *pValue, uint16_t *pLen,
@@ -372,6 +380,15 @@ static bStatus_t BSP_LightReadAttrCB(uint16_t connHandle, gattAttribute_t *pAttr
             tmos_memcpy(pValue, pAttr->pValue, *pLen);
             break;
 
+        case BSP_BLE_COUNTDOWN_UUID:
+            /* report the live remaining seconds, not the last written value */
+            valCountdown[0] = (uint8_t)(countdownRemainSec & 0xFF);
+            valCountdown[1] = (uint8_t)((countdownRemainSec >> 8) & 0xFF);
+            *pLen = 2;
+            if (*pLen > maxLen) *pLen = maxLen;
+            tmos_memcpy(pValue, valCountdown, *pLen);
+            break;
+
         default:
             *pLen = 0;
             status = ATT_ERR_ATTR_NOT_FOUND;
@@ -381,7 +398,7 @@ static bStatus_t BSP_LightReadAttrCB(uint16_t connHandle, gattAttribute_t *pAttr
 }
 
 /* ============================================================
- *  GATT –¥ªÿµ˜
+ *  GATT ÂÜôÂõûË∞É
  * ============================================================ */
 static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAttr,
                                       uint8_t *pValue, uint16_t len,
@@ -420,7 +437,7 @@ static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAtt
             break;
 
         case BSP_BLE_BRIGHTNESS_UUID:
-            /* °æ–ﬁ∏ƒ°ø…œœﬁ∏ƒŒ™ BSP_LIGHT_BRIGHTNESS_LIMIT(70) */
+            /* „Äê‰øÆÊîπ„Äë‰∏äÈôêÊîπ‰∏∫ BSP_LIGHT_BRIGHTNESS_LIMIT(100) */
             if (len != 1 || pValue[0] > BSP_LIGHT_BRIGHTNESS_LIMIT)
                 status = ATT_ERR_INVALID_VALUE_SIZE;
             else
@@ -492,7 +509,7 @@ static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAtt
             {
                 BSP_RtcTimer_t newTimer;
                 memcpy(&newTimer, pValue, sizeof(newTimer));
-                /* °æ–ﬁ∏ƒ°ø¡¡∂»…œœﬁ 70£ªÕ¨ ±–£—È enable / repeat */
+                /* „Äê‰øÆÊîπ„Äë‰∫ÆÂ∫¶‰∏äÈôê 100ÔºõÂêåÊó∂Ê†°È™å enable / repeat */
                 if (newTimer.enable > 1 ||
                     newTimer.hour > 23 || newTimer.minute > 59 ||
                     newTimer.brightness > BSP_LIGHT_BRIGHTNESS_LIMIT ||
@@ -505,6 +522,33 @@ static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAtt
                 {
                     BSP_RTC_SetTimer(&newTimer);
                     memcpy(valTimer, pValue, sizeof(newTimer));
+                }
+            }
+            break;
+
+        case BSP_BLE_COUNTDOWN_UUID:
+            if (len != 2)
+            {
+                status = ATT_ERR_INVALID_VALUE_SIZE;
+            }
+            else
+            {
+                uint16_t seconds = (uint16_t)(pValue[0] | ((uint16_t)pValue[1] << 8));
+                if (seconds == 0)
+                {
+                    countdownRemainSec = 0;
+                    valCountdown[0] = 0;
+                    valCountdown[1] = 0;
+                }
+                else if (seconds < BSP_BLE_COUNTDOWN_MIN_SEC || seconds > BSP_BLE_COUNTDOWN_MAX_SEC)
+                {
+                    status = ATT_ERR_INVALID_VALUE_SIZE;
+                }
+                else
+                {
+                    countdownRemainSec = seconds;
+                    valCountdown[0] = (uint8_t)(seconds & 0xFF);
+                    valCountdown[1] = (uint8_t)((seconds >> 8) & 0xFF);
                 }
             }
             break;
@@ -536,7 +580,7 @@ static bStatus_t BSP_LightWriteAttrCB(uint16_t connHandle, gattAttribute_t *pAtt
 }
 
 /* ============================================================
- *  µÁ≥ÿÕ®÷™
+ *  ÁîµÊ±†ÈÄöÁü•
  * ============================================================ */
 static void BSP_Ble_NotifyBattery(void)
 {
@@ -563,7 +607,7 @@ static void BSP_Ble_NotifyBattery(void)
 }
 
 /* ============================================================
- *  ÷‹∆⁄»ŒŒÒ
+ *  Âë®Êúü‰ªªÂä°
  * ============================================================ */
 static void BSP_Ble_Tick(void)
 {
@@ -580,6 +624,22 @@ static void BSP_Ble_Tick(void)
 
         /* advance the software wall clock on top of the RTC cycle counter */
         BSP_RTC_Tick();
+
+        /* 0xFFFA countdown (phone-side "switch off after N idle minutes") */
+        if (countdownRemainSec > 0)
+        {
+            countdownRemainSec--;
+            valCountdown[0] = (uint8_t)(countdownRemainSec & 0xFF);
+            valCountdown[1] = (uint8_t)((countdownRemainSec >> 8) & 0xFF);
+            if (countdownRemainSec == 0)
+            {
+                BSP_LightState_t light;
+                BSP_LED_GetState(&light);
+                light.power = 0;
+                BSP_LED_SetState(&light);
+                valPower = 0;
+            }
+        }
 
         if (autoOffRemainSec > 0)
         {
@@ -618,7 +678,7 @@ static void BSP_Ble_Tick(void)
 }
 
 /* ============================================================
- *  ∑˛ŒÒ◊¢≤· /  ¬º˛¥¶¿Ì
+ *  ÊúçÂä°Ê≥®ÂÜå / ‰∫ã‰ª∂Â§ÑÁêÜ
  * ============================================================ */
 static bStatus_t BSP_Ble_AddLightService(void)
 {
@@ -713,6 +773,9 @@ void BSP_BLE_Init(void)
     GGS_SetParameter(GGS_DEVICE_NAME_ATT, sizeof(attDeviceName) - 1, attDeviceName);
 
     valBattery = BSP_BAT_GetLevel();
+    countdownRemainSec = 0;
+    valCountdown[0] = 0;
+    valCountdown[1] = 0;
     read_wall_clock_into_attr();
 
     tmos_set_event(BSP_BleTaskID, BSP_BLE_START_DEVICE_EVT);

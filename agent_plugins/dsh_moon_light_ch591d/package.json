@@ -1,0 +1,40 @@
+{
+  "name": "dsh-ble-light",
+  "version": "0.1.0",
+  "description": "CH591D 蓝牙小夜灯控制：用 Web Bluetooth 直连灯控 GATT 服务（0xFFF0），按 DSH 会话状态（运行中 / 完成 / 等待审批 / 等待回答 / 空闲）自动设定灯色与跑马灯灯效；空闲时可让灯具内部 RTC 倒计时 0.5–15 分钟后自动关灯。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "bluetooth",
+    "web-bluetooth",
+    "ch591d",
+    "light"
+  ],
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node scripts/test.cjs"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

@@ -7,7 +7,7 @@ static uint32_t g_tick;
 
 static void pwm_out_channel(uint8_t ch, uint8_t value)
 {
-    /* PWM cycle is 64; value 0..63 maps to 0..~100% */
+    /* PWM cycle is 256; value 0..255 maps to 0..~100% */
     PWMX_ACTOUT(ch, value, High_Level, ENABLE);
 }
 
@@ -120,11 +120,11 @@ void BSP_LED_Init(void)
     GPIOA_ModeCfg(IO_RED | IO_GREEN, GPIO_ModeOut_PP_5mA);
     GPIOB_ModeCfg(IO_BLUE,          GPIO_ModeOut_PP_5mA);
 
-    PWMX_CLKCfg(1);                    /* PWM base clock = 4/Fsys */
-    PWMX_CycleCfg(PWMX_Cycle_256);      /* 64 steps per PWM period */
+    PWMX_CLKCfg(1);                    /* PWM base clock = Fsys / 1 = 60 MHz */
+    PWMX_CycleCfg(PWMX_Cycle_256);      /* 256 steps per PWM period */
 
     g_light.power = 0;
-    g_light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;   /* д╛хо 70 */
+    g_light.brightness = BSP_LIGHT_BRIGHTNESS_LIMIT;   /* д╛хо 100 */
     g_light.mode = BSP_LIGHT_MODE_FIXED;
     g_light.rgb[0] = 255;
     g_light.rgb[1] = 255;

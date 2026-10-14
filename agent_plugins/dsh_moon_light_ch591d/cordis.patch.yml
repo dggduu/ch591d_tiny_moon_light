@@ -1,0 +1,85 @@
+# ============================================================================
+# dsh-ble-light —— DSH bundle patch（插件挂载声明 + 部署级默认配置）
+# ============================================================================
+# DSH 启动时按 bundle 层栈叠加各插件的 patch，本文件把插件行插入配置树。
+# 浏览器端（client.js）从这一行读到 config，作为「部署默认值」使用。
+#
+# 配置优先级：localStorage（设置面板里改的）> 本文件 config > 内置默认。
+# 所以改完这里需要点一次设置面板里的「恢复默认」才会生效（或清掉浏览器里
+# 该站点的 localStorage 键 dsh-ble-light:config）。
+#
+# 状态映射（自动切换，无需配置）：
+#   running（运行中）      -> 绿色呼吸
+#   success（完成）        -> 粉色常亮
+#   approval（等待审批）   -> 琥珀 + 红软件跑马灯（未知 kind 也归到这里）
+#   questioning（等待回答 / 计划确认）-> 青 + 紫软件跑马灯
+#   idle（空闲）           -> 暖白微亮，并按下方 idleAutoOffMinutes 启动灯内倒计时
+# ============================================================================
+
+- insert:
+    - id: ble-light
+      name: dsh-ble-light
+      config:
+        # 总开关：false 时下发关灯并停止驱动
+        enabled: true
+        # 打开页面后自动重连上次已授权的设备（免二次选择，Chrome/Edge）
+        autoConnect: true
+        # 状态驱动时自动开灯 / 关灯；false 时只改灯色灯效，不动电源
+        autoPower: true
+        # 意外断线后自动重连（退避重试）
+        reconnect: true
+        # 页面左下角显示一行极小的连接状态角标
+        showStatus: true
+        # 相邻两次 GATT 特征写入之间的最小间隔（ms），太小会被协议栈排队/丢包
+        writeGapMs: 60
+
+        # ---- 空闲自动关灯（用灯具内部 RTC 的 0xFFFA 倒计时）----
+        # 取值范围 0.5–15 分钟（固件只接受 30..900 秒）
+        idleAutoOffEnabled: true
+        idleAutoOffMinutes: 5
+        # 「完成」状态是否也计入空闲计时（默认只对「空闲」计时）
+        idleAutoOffIncludeSuccess: false
+
+        # ---- 各 DSH 状态的灯效 ----
+        # mode: 'off' 关闭 | 'fixed' 固定色 | 'breathing' 呼吸
+        #       'gradient' 彩虹渐变(硬件) | 'colorful' 跑马灯(硬件 COLORFUL)
+        #       'cycle' 多色跑马灯(软件轮播，用下面的 colors 列表)
+        # colors: 最多 6 个 #rrggbb；fixed/breathing 用第一个，cycle 依次轮播
+        # brightness: 0..100   speed: 0..100（渐变/跑马灯的轮转速度、呼吸速度）
+        # intervalMs: 仅 cycle 用，换色间隔（150..5000ms）
+        states:
+          # 运行中：绿色呼吸
+          running:
+            mode: 'breathing'
+            colors: ['#10b981']
+            brightness: 60
+            speed: 40
+            intervalMs: 600
+          # 完成：粉色常亮
+          success:
+            mode: 'fixed'
+            colors: ['#ec4899']
+            brightness: 40
+            speed: 30
+            intervalMs: 600
+          # 等待审批（pendingInteraction.kind = approval，也是未知 kind 的兜底）：琥珀 + 红
+          approval:
+            mode: 'cycle'
+            colors: ['#f59e0b', '#ef4444']
+            brightness: 72
+            speed: 45
+            intervalMs: 420
+          # 等待回答 / 计划确认（kind = question）：青+紫，与审批区分开
+          questioning:
+            mode: 'cycle'
+            colors: ['#22d3ee', '#a855f7']
+            brightness: 68
+            speed: 40
+            intervalMs: 500
+          # 空闲：暖白微亮，配合上面的空闲倒计时
+          idle:
+            mode: 'fixed'
+            colors: ['#ffd9a0']
+            brightness: 8
+            speed: 20
+            intervalMs: 800
